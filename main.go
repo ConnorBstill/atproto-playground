@@ -16,6 +16,19 @@ type User struct {
 	Password   string `json:"password"`
 }
 
+type OauthMetadata struct {
+	ClientName              string    `json:"client_name"`
+	ClientId                string    `json:"client_id"`
+	ClientUri               string    `json:"client_uri"`
+	RedirectUris            [1]string `json:"redirect_uris"`
+	Scope                   string    `json:"scope"`
+	GrantTypes              [2]string `json:"grant_types"`
+	ResponseTypes           [1]string `json:"response_types"`
+	ApplicationType         string    `json:"application_type"`
+	TokenEndpointAuthMethod string    `json:"token_endpoint_auth_method"`
+	DpopBoundAccesToken     bool      `json:"dpop_bound_access_tokens"`
+}
+
 var userCache = make(map[int]User)
 
 var cacheMutex sync.RWMutex
@@ -24,8 +37,9 @@ func main() {
 	mux := http.NewServeMux()
 	// mux.HandleFunc("/", handleRoot)
 
-	mux.HandleFunc("POST /user", getUserAuth)
+	mux.HandleFunc("GET /client-metadata.json", exposeMetadata)
 	mux.HandleFunc("GET /user/{id}", getUser)
+	mux.HandleFunc("POST /user", getUserAuth)
 	mux.HandleFunc("DELETE /user/{id}", deleteUser)
 
 	fmt.Println("Listening on port 8080")
@@ -58,14 +72,32 @@ func isValidHandle(handle string) bool {
 	return match
 }
 
+func exposeMetadata(writer http.ResponseWriter, request *http.Request) {
+	metadata := OauthMetadata{
+		"Social data Transfer",
+		"localhost:8080/client-metadata.json",
+		"localhost:8080",
+		[1]string{"localhost:8080/oauth/callback"},
+		"atproto transition:generic",
+		[2]string{"authorization_code", "refresh_token"},
+		[1]string{"code"},
+		"web",
+		"none",
+		true,
+	}
+
+	metadataJson, _ := json.Marshal(metadata)
+
+	writer.WriteHeader(http.StatusOK)
+	writer.Write(metadataJson)
+}
+
 func getUserAuth(writer http.ResponseWriter, request *http.Request) {
 	var user User
 
 	err := json.NewDecoder(request.Body).Decode((&user))
-
 	handleError(writer, err, http.StatusBadRequest)
 
-	fmt.Printf("handle: %+v\n", user.Identifier)
 	if !isValidHandle(user.Identifier) {
 		http.Error(
 			writer,
@@ -90,10 +122,7 @@ func getUserAuth(writer http.ResponseWriter, request *http.Request) {
 
 	body, err := io.ReadAll(resp.Body)
 
-	fmt.Printf("resp Body: %v\n", string(body))
-
 	writer.Header().Set("Content-Type", "application/json")
-
 	writer.Write(body)
 }
 
