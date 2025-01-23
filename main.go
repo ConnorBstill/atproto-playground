@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"sync"
+
+	"github.com/joho/godotenv"
 )
 
 type User struct {
@@ -26,7 +30,7 @@ type OauthMetadata struct {
 	ResponseTypes           [1]string `json:"response_types"`
 	ApplicationType         string    `json:"application_type"`
 	TokenEndpointAuthMethod string    `json:"token_endpoint_auth_method"`
-	DpopBoundAccesToken     bool      `json:"dpop_bound_access_tokens"`
+	DpopBoundAccessToken    bool      `json:"dpop_bound_access_tokens"`
 }
 
 var userCache = make(map[int]User)
@@ -34,6 +38,10 @@ var userCache = make(map[int]User)
 var cacheMutex sync.RWMutex
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	mux := http.NewServeMux()
 	// mux.HandleFunc("/", handleRoot)
 
@@ -42,8 +50,11 @@ func main() {
 	mux.HandleFunc("POST /user", getUserAuth)
 	mux.HandleFunc("DELETE /user/{id}", deleteUser)
 
-	fmt.Println("Listening on port 8080")
-	http.ListenAndServe(":8080", mux)
+	appPort := os.Getenv("PORT")
+	fmt.Println("Listening on port", appPort)
+
+	addr := fmt.Sprintf(":%s", appPort)
+	http.ListenAndServe(addr, mux)
 }
 
 // func handleRoot(
