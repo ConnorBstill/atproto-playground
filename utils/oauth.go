@@ -24,22 +24,39 @@ type PKCE struct {
 }
 
 func getDidFromHandle(ctx context.Context, handle syntax.Handle) (*identity.Identity, error) {
-	identity, err := identity.DefaultDirectory().LookupHandle(ctx, handle)
+	userIdentity, err := identity.DefaultDirectory().LookupHandle(ctx, handle)
 
-	return identity, err
+	return userIdentity, err
 }
 
 func GetDocumentFromHandle(ctx context.Context, handle syntax.Handle) (identity.DIDDocument, error) {
-	did, err := getDidFromHandle(ctx, handle)
+	userIdentity, err := getDidFromHandle(ctx, handle)
 	if err != nil {
 		return identity.DIDDocument{}, err
 	}
 
+	userIdentity.PDSEndpoint()
+
+	// signal:
+	// {
+	// 	scope: 'atproto transition:generic',
+	// }
+
 	resolver := identity.BaseDirectory(identity.BaseDirectory{})
 
-	document, err := resolver.ResolveDID(ctx, did.DID)
+	document, err := resolver.ResolveDID(ctx, userIdentity.DID)
 
 	return *document, err
+}
+
+func getResourceServeMetadata(pdsUrl string) {
+	// fetchMetadata
+	// const request = new Request(url, {
+	// 	signal: options?.signal,
+	// 	headers: { accept: 'application/json' },
+	// 	cache: options?.noCache ? 'no-cache' : undefined,
+	// 	redirect: 'manual', // response must be 200 OK
+	// })
 }
 
 func normalizeHandle(handle string) string {
@@ -115,4 +132,8 @@ func GeneratePKCE(byteLength int8) (PKCE, error) {
 			"S256",
 		},
 		nil
+}
+
+func GenerateDpopKey(algs []string) {
+
 }
