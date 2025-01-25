@@ -69,14 +69,18 @@ func main() {
 
 func handleError(writer http.ResponseWriter, err error, status int) {
 	if err != nil {
-		http.Error(
-			writer,
-			err.Error(),
-			status,
-		)
+		throwError(writer, err.Error(), status)
 
 		return
 	}
+}
+
+func throwError(writer http.ResponseWriter, errorMsg string, status int) {
+	http.Error(
+		writer,
+		errorMsg,
+		status,
+	)
 }
 
 func isValidHandle(handle string) bool {
@@ -88,7 +92,11 @@ func isValidHandle(handle string) bool {
 
 func initiateOauth(writer http.ResponseWriter, request *http.Request) {
 	// oauth.GenerateVerifier(64)
-	oauth.GeneratePKCE(64)
+	pkce, err := oauth.GeneratePKCE(64)
+	document, err := oauth.GetDocumentFromHandle(request.Context(), "connorbstill.bsky.social")
+	fmt.Println(document.AlsoKnownAs)
+	fmt.Println(pkce)
+	handleError(writer, err, http.StatusInternalServerError)
 	// https://bsky.social/oauth/authorize?client_id=http%3A%2F%2Flocalhost%3Fredirect_uri%3Dhttp%253A%252F%252F127.0.0.1%253A8080%252Foauth%252Fcallback%26scope%3Datproto%2520transition%253Ageneric&request_uri=urn%3Aietf%3Aparams%3Aoauth%3Arequest_uri%3Areq-e14975c48319643639a8a4f743b263e2
 
 	writer.Header().Set("Content-Type", "application/json")

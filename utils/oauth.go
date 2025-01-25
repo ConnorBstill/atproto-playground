@@ -2,18 +2,91 @@ package oauth
 
 import (
 	// "bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
+	"regexp"
+	"strings"
 
 	// "errors"
 	"fmt"
+
+	"github.com/bluesky-social/indigo/atproto/identity"
+	"github.com/bluesky-social/indigo/atproto/syntax"
 )
 
 type PKCE struct {
 	Verifier  string
 	Challenge string
 	method    string
+}
+
+func getDidFromHandle(ctx context.Context, handle syntax.Handle) (*identity.Identity, error) {
+	identity, err := identity.DefaultDirectory().LookupHandle(ctx, handle)
+
+	return identity, err
+}
+
+func GetDocumentFromHandle(ctx context.Context, handle syntax.Handle) (identity.DIDDocument, error) {
+	did, err := getDidFromHandle(ctx, handle)
+	if err != nil {
+		return identity.DIDDocument{}, err
+	}
+
+	resolver := identity.BaseDirectory(identity.BaseDirectory{})
+
+	document, err := resolver.ResolveDID(ctx, did.DID)
+
+	return *document, err
+}
+
+func normalizeHandle(handle string) string {
+	return strings.ToLower(handle)
+}
+
+func EnsureValidHandle(handle string) (bool, error) {
+	asciiCharsPattern := `^[a-zA-Z0-9.-]*$`
+	handleRegex := regexp.MustCompile(asciiCharsPattern)
+
+	asciiLettersPattern := `^[a-zA-Z]`
+	labelRegex := regexp.MustCompile(asciiLettersPattern)
+
+	if !handleRegex.MatchString((handle)) {
+		return false, errors.New("handle contains invalid characters")
+	}
+
+	if len(handle) > 253 {
+		return false, errors.New("handle is too long (253 chars max)")
+	}
+
+	labels := strings.Split(handle, ".")
+	if len(labels) < 2 {
+		return false, errors.New("handle domain needs at least two parts")
+	}
+
+	for i := 0; i < len(labels); i++ {
+		label := labels[i]
+
+		if len(label) < 1 {
+			return false, errors.New("handle parts can not be empty")
+		}
+
+		if len(label) > 63 {
+			return false, errors.New("handle part too long (max 63 chars)")
+		}
+
+		if string(label[0]) == "-" || string(label[len(label)-1]) == "-" {
+			return false, errors.New("handle parts can not start or end with hyphens")
+		}
+
+		if i+1 == len(labels) && !labelRegex.MatchString(label) {
+			return false, errors.New("handle final component (TLD) must start with ASCII letter")
+		}
+	}
+
+	return true, nil
 }
 
 func GenerateVerifier(byteLength int8) string {
